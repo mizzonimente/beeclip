@@ -13,21 +13,35 @@ interface JwtNamespace {
   verify<T = AccessTokenPayload>(token: string, options?: Record<string, unknown>): T;
 }
 
+interface JwtNamespaces {
+  access: JwtNamespace;
+  refresh: JwtNamespace;
+}
+
 declare module "fastify" {
   interface FastifyInstance {
-    // @fastify/jwt con l'opzione `namespace: "x"` decora l'istanza con
-    // `fastify.jwt.x` (un oggetto Object.create(null) condiviso tra tutti i
-    // namespace registrati), NON con `fastify.x` direttamente — vedi
-    // node_modules/@fastify/jwt/jwt.js, riga "fastify.jwt[namespace] = ...".
-    jwt: {
-      access: JwtNamespace;
-      refresh: JwtNamespace;
-    };
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
   interface FastifyRequest {
     currentUserId: string;
   }
+}
+
+/**
+ * @fastify/jwt con l'opzione `namespace: "x"` decora l'istanza con
+ * `fastify.jwt.x` (un oggetto Object.create(null) condiviso tra tutti i
+ * namespace registrati), NON con `fastify.x` direttamente — vedi
+ * node_modules/@fastify/jwt/jwt.js, riga "fastify.jwt[namespace] = ...".
+ *
+ * Non possiamo ridichiarare `jwt` in `declare module "fastify"`: il plugin
+ * dichiara già `jwt: JWT` (il tipo del namespace di default) e TypeScript
+ * non permette due dichiarazioni della stessa proprietà con tipi diversi
+ * (errore TS2717). Leggiamo quindi l'oggetto runtime con un cast esplicito
+ * tramite questo helper, unico punto che "conosce" la forma reale di
+ * `fastify.jwt` quando si usano due namespace insieme.
+ */
+export function jwtNamespaces(fastify: FastifyInstance): JwtNamespaces {
+  return fastify.jwt as unknown as JwtNamespaces;
 }
 
 /**
@@ -63,7 +77,7 @@ export const authPlugin = fastifyPlugin(async (fastify: FastifyInstance, opts: {
       return;
     }
     try {
-      const payload = fastify.jwt.access.verify<AccessTokenPayload>(header.slice("Bearer ".length));
+      const payload = jwtNamespaces(fastify).access.verify<AccessTokenPayload>(header.slice("Bearer ".length));
       request.currentUserId = payload.sub;
     } catch {
       reply.code(401).send({ error: "Token di accesso non valido o scaduto" });

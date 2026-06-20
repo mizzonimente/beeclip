@@ -29,7 +29,7 @@ export function extractDriveFileId(rawUrl: string): string | null {
   if (!DRIVE_HOSTNAMES.has(url.hostname)) return null;
 
   const pathMatch = url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if (pathMatch) return pathMatch[1];
+  if (pathMatch) return pathMatch[1] ?? null;
 
   const idParam = url.searchParams.get("id");
   if (idParam) return idParam;
@@ -89,7 +89,8 @@ export async function downloadPublicDriveFile(fileId: string): Promise<DriveDown
 
   const disposition = res.headers.get("content-disposition");
   const filenameMatch = disposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-  const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : null;
+  const capturedFilename = filenameMatch?.[1];
+  const filename = capturedFilename ? decodeURIComponent(capturedFilename) : null;
 
   const lengthHeader = res.headers.get("content-length");
   const sizeBytes = lengthHeader ? Number(lengthHeader) : null;

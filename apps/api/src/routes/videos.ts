@@ -37,7 +37,7 @@ async function assertProjectAndQuota(
   if (!project) return { error: { code: 404, message: "Progetto non trovato" } };
 
   const quota = await checkClipQuota(userId);
-  if (!quota.allowed) return { error: { code: 402, message: quota.reason } };
+  if (!quota.allowed) return { error: { code: 402, message: quota.reason ?? "Limite piano raggiunto" } };
 
   return { project };
 }

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { prisma } from "@clipmanager/db";
 import { registerSchema, loginSchema } from "@clipmanager/shared";
+import { jwtNamespaces } from "../plugins/auth.js";
 
 export async function authRoutes(fastify: FastifyInstance) {
   fastify.post("/auth/register", async (request, reply) => {
@@ -29,8 +30,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
     }
 
-    const accessToken = fastify.jwt.access.sign({ sub: user.id, email: user.email });
-    const refreshToken = fastify.jwt.refresh.sign({ sub: user.id, email: user.email });
+    const accessToken = jwtNamespaces(fastify).access.sign({ sub: user.id, email: user.email });
+    const refreshToken = jwtNamespaces(fastify).refresh.sign({ sub: user.id, email: user.email });
     return reply.code(201).send({
       user: { id: user.id, email: user.email, name: user.name },
       accessToken,
@@ -50,8 +51,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.code(401).send({ error: "Email o password non corrette" });
     }
 
-    const accessToken = fastify.jwt.access.sign({ sub: user.id, email: user.email });
-    const refreshToken = fastify.jwt.refresh.sign({ sub: user.id, email: user.email });
+    const accessToken = jwtNamespaces(fastify).access.sign({ sub: user.id, email: user.email });
+    const refreshToken = jwtNamespaces(fastify).refresh.sign({ sub: user.id, email: user.email });
     return reply.send({
       user: { id: user.id, email: user.email, name: user.name },
       accessToken,
@@ -65,8 +66,8 @@ export async function authRoutes(fastify: FastifyInstance) {
       return reply.code(400).send({ error: "refreshToken mancante nel body" });
     }
     try {
-      const payload = fastify.jwt.refresh.verify<{ sub: string; email: string }>(refreshToken);
-      const accessToken = fastify.jwt.access.sign({ sub: payload.sub, email: payload.email });
+      const payload = jwtNamespaces(fastify).refresh.verify<{ sub: string; email: string }>(refreshToken);
+      const accessToken = jwtNamespaces(fastify).access.sign({ sub: payload.sub, email: payload.email });
       return reply.send({ accessToken });
     } catch {
       return reply.code(401).send({ error: "Refresh token non valido o scaduto" });
