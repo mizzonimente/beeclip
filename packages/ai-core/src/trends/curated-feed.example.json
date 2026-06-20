@@ -1,0 +1,52 @@
+{
+  "lastUpdated": "2026-06-10",
+  "note": "Feed curato manualmente dal team (es. da osservazione diretta delle piattaforme o da newsletter di settore). Aggiornare questo file periodicamente: il provider segnala se i dati sono piu' vecchi di TREND_CURATED_MAX_AGE_DAYS.",
+  "platforms": {
+    "TIKTOK": {
+      "trendingSounds": [
+        { "name": "Suono originale - voce + pausa drammatica", "usageGrowthPct": 18 },
+        { "name": "Remix lo-fi di un dialogo di film", "usageGrowthPct": 12 }
+      ],
+      "emergingHashtags": ["#dietrolequinte", "#imparalo30secondi", "#cosanessunoti dice"],
+      "viralFormats": [
+        { "name": "Prima/Dopo veloce", "description": "Stato iniziale vs risultato in meno di 3 secondi, poi spiegazione." },
+        { "name": "Mito vs Realta'", "description": "Contrappone una credenza comune al dato reale con tono diretto." }
+      ],
+      "growingNiches": ["produttivita' personale", "finanza per principianti", "micro-business locali"]
+    },
+    "INSTAGRAM": {
+      "trendingSounds": [
+        { "name": "Traccia strumentale crescente per reveal", "usageGrowthPct": 9 }
+      ],
+      "emergingHashtags": ["#reelsitalia", "#dietrolequinte", "#impariin1minuto"],
+      "viralFormats": [
+        { "name": "Caroselli con hook nella prima slide", "description": "Slide 1 = domanda/promessa forte, slide successive = payoff." }
+      ],
+      "growingNiches": ["wellness pratico", "home organization"]
+    },
+    "YOUTUBE_SHORTS": {
+      "trendingSounds": [],
+      "emergingHashtags": ["#shorts", "#impara", "#dietrolequinte"],
+      "viralFormats": [
+        { "name": "Domanda nel titolo + risposta nei primi 3s", "description": "Il titolo pone una domanda, il video risponde immediatamente." }
+      ],
+      "growingNiches": ["tutorial rapidi", "recensioni oneste"]
+    },
+    "LINKEDIN": {
+      "trendingSounds": [],
+      "emergingHashtags": ["#dietrolequinte", "#leadership", "#carriera"],
+      "viralFormats": [
+        { "name": "Lezione da un errore personale", "description": "Racconto breve di un errore + lezione applicabile." }
+      ],
+      "growingNiches": ["personal branding B2B", "assunzioni e recruiting"]
+    },
+    "FACEBOOK": {
+      "trendingSounds": [],
+      "emergingHashtags": ["#community", "#dietrolequinte"],
+      "viralFormats": [
+        { "name": "Storia lunga con foto singola", "description": "Caption narrativa estesa, alto tasso di commenti nei gruppi di nicchia." }
+      ],
+      "growingNiches": ["gruppi di community locali"]
+    }
+  }
+}

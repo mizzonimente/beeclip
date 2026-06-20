@@ -1,0 +1,27 @@
+{
+  "name": "clipmanager-ai",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "ioredis": "5.10.1"
+  },
+  "scripts": {
+    "dev:api": "npm run dev -w @clipmanager/api",
+    "dev:worker": "npm run dev -w @clipmanager/worker",
+    "dev:web": "npm run dev -w @clipmanager/web",
+    "db:generate": "npm run generate -w @clipmanager/db",
+    "db:migrate": "npm run migrate:dev -w @clipmanager/db",
+    "db:seed": "npm run seed -w @clipmanager/db",
+    "db:seed-test-user": "npm run seed:test-user -w @clipmanager/db",
+    "build": "npm run build -w @clipmanager/shared && npm run build -w @clipmanager/ai-core && npm run build -w @clipmanager/api && npm run build -w @clipmanager/worker && npm run build -w @clipmanager/web",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

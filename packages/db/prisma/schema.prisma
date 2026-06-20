@@ -1,0 +1,370 @@
+// ClipManager AI — Database schema
+// Vedi docs/04-database-schema.md per le motivazioni di design.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Enum
+// ──────────────────────────────────────────────────────────────────────────
+
+enum ContentType {
+  EDUCATIONAL
+  ENTERTAINMENT
+  PROMO
+  PODCAST
+  INTERVIEW
+  VLOG
+  BACKSTAGE
+  MUSIC
+  CORPORATE
+  CREATOR
+}
+
+enum VideoStatus {
+  UPLOADED
+  EXTRACTING_AUDIO
+  TRANSCRIBING
+  ANALYZING
+  RENDERING_CLIPS
+  READY
+  FAILED
+}
+
+// Come è arrivato il file video nello storage: upload diretto da file, o
+// importato da un link pubblico Google Drive. YouTube/social non hanno una
+// voce qui perché non esiste un import automatico reale per quei casi (vedi
+// docs/02-architecture.md §7) — restano solo upload manuale dell'utente.
+enum VideoSourceType {
+  FILE_UPLOAD
+  DRIVE_LINK
+}
+
+enum ClipFormat {
+  VERTICAL_9_16
+  SQUARE_1_1
+  HORIZONTAL_16_9
+  VERTICAL_4_5
+  CUSTOM
+}
+
+enum CropMode {
+  CENTER
+  SMART
+  MANUAL
+}
+
+enum ClipStatus {
+  QUEUED
+  RENDERING
+  READY
+  FAILED
+}
+
+enum SocialPlatform {
+  TIKTOK
+  INSTAGRAM
+  YOUTUBE_SHORTS
+  LINKEDIN
+  FACEBOOK
+  OTHER
+}
+
+enum ProfileType {
+  OWN
+  REFERENCE
+}
+
+enum ProfileConnectionType {
+  OAUTH
+  MANUAL
+  LICENSED_PROVIDER
+}
+
+enum TrendSource {
+  MOCK
+  LICENSED_PROVIDER
+  CURATED
+}
+
+enum JobType {
+  VIDEO_PROCESSING
+  CLIP_EXPORT
+  TREND_REFRESH
+  SOCIAL_PROFILE_REFRESH
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Utenti, piani, billing
+// ──────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  projects        Project[]
+  socialProfiles  SocialProfile[]
+  subscription    Subscription?
+  usageCounters   UsageCounter[]
+}
+
+model Plan {
+  id                  String   @id @default(cuid())
+  name                String   @unique // FREE, STARTER, PRO, AGENCY
+  priceMonthlyCents    Int
+  minutesPerMonth      Int
+  clipsPerMonth        Int
+  maxReferenceProfiles Int
+  maxExportResolution  String   // "720p" | "1080p" | "4k"
+  features            Json     @default("{}")
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id])
+  planId                String
+  plan                  Plan     @relation(fields: [planId], references: [id])
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  status                String   @default("active") // active, past_due, canceled
+  currentPeriodEnd      DateTime?
+  createdAt             DateTime @default(now())
+}
+
+model UsageCounter {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  periodStart      DateTime
+  periodEnd        DateTime
+  minutesProcessed Float    @default(0)
+  clipsGenerated   Int      @default(0)
+
+  @@unique([userId, periodStart])
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Progetti e video
+// ──────────────────────────────────────────────────────────────────────────
+
+model Project {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id])
+  title          String
+  description    String?
+  industry       String?
+  contentGoal    String?
+  targetAudience String?
+  contentType    ContentType @default(CREATOR)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  videos       Video[]
+  clips        Clip[]
+  contentIdeas ContentIdea[]
+}
+
+model Video {
+  id               String      @id @default(cuid())
+  projectId        String
+  project          Project     @relation(fields: [projectId], references: [id])
+  originalFilename String
+  storageKey       String
+  durationSeconds  Float?
+  width            Int?
+  height           Int?
+  fps              Float?
+  status           VideoStatus @default(UPLOADED)
+  sourceType       VideoSourceType @default(FILE_UPLOAD)
+  sourceUrl        String?     // link Drive originale, solo quando sourceType = DRIVE_LINK
+  errorMessage     String?
+  desiredClipCount Int?        // null = modalità automatica
+  avgClipDuration  Int?        // secondi
+  minClipDuration  Int         @default(15)
+  maxClipDuration  Int         @default(90)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  transcript      Transcript?
+  clipCandidates  ClipCandidate[]
+  jobs            Job[]
+}
+
+model Transcript {
+  id         String   @id @default(cuid())
+  videoId    String   @unique
+  video      Video    @relation(fields: [videoId], references: [id])
+  language   String   @default("it")
+  fullText   String
+  segments   Json     // [{ start, end, text, words: [{ start, end, text }] }]
+  provider   String   // "openai-whisper" | "heuristic-mock"
+  createdAt  DateTime @default(now())
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Analisi e clip
+// ──────────────────────────────────────────────────────────────────────────
+
+model ClipCandidate {
+  id              String   @id @default(cuid())
+  videoId         String
+  video           Video    @relation(fields: [videoId], references: [id])
+  startSeconds    Float
+  endSeconds      Float
+  hookScore       Float    // 0-100
+  emotionScore    Float
+  retentionScore  Float
+  pacingScore     Float
+  clarityScore    Float
+  standaloneScore Float
+  aggregateScore  Float
+  emotionTags     String[]
+  rationale       String
+  selected        Boolean  @default(false)
+  provider        String   // "anthropic" | "openai" | "heuristic-mock"
+  createdAt       DateTime @default(now())
+
+  analysisResult AnalysisResult?
+  clips          Clip[]
+}
+
+model AnalysisResult {
+  id                  String        @id @default(cuid())
+  clipCandidateId     String        @unique
+  clipCandidate       ClipCandidate @relation(fields: [clipCandidateId], references: [id])
+  viralScore          Int           // 0-100
+  viralReasoning      String
+  strengths           String[]
+  weaknesses          String[]
+  suggestedTitle      String
+  suggestedDescription String
+  suggestedCaption    String
+  suggestedHook       String
+  suggestedOverlayText String
+  suggestedCoverHint  String
+  hashtags            String[]
+  provider            String
+  createdAt           DateTime      @default(now())
+}
+
+model Clip {
+  id              String     @id @default(cuid())
+  clipCandidateId String
+  clipCandidate   ClipCandidate @relation(fields: [clipCandidateId], references: [id])
+  projectId       String
+  project         Project    @relation(fields: [projectId], references: [id])
+  format          ClipFormat
+  cropMode        CropMode   @default(SMART)
+  customCrop      Json?      // { x, y, width, height } se MANUAL
+  storageKey      String?
+  thumbnailKey    String?
+  durationSeconds Float?
+  status          ClipStatus @default(QUEUED)
+  errorMessage    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  exportHistory ExportHistory[]
+
+  @@index([status])
+}
+
+model ExportHistory {
+  id         String   @id @default(cuid())
+  clipId     String
+  clip       Clip     @relation(fields: [clipId], references: [id])
+  format     ClipFormat
+  storageKey String
+  sizeBytes  Int?
+  exportedAt DateTime @default(now())
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Profili social e trend
+// ──────────────────────────────────────────────────────────────────────────
+
+model SocialProfile {
+  id                   String                @id @default(cuid())
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id])
+  type                 ProfileType
+  platform             SocialPlatform
+  handle               String
+  connectedVia         ProfileConnectionType @default(MANUAL)
+  toneOfVoice          String?
+  recurringFormats     Json?
+  hashtagsUsed         String[]
+  visualStyle          String?
+  postingFrequency     String?
+  avgEngagementRate    Float?
+  bestPerformingContent Json?
+  lastAnalyzedAt       DateTime?
+  createdAt            DateTime              @default(now())
+}
+
+model TrendSnapshot {
+  id                String         @id @default(cuid())
+  date              DateTime       @db.Date
+  platform          SocialPlatform
+  trendingSounds    Json
+  emergingHashtags  String[]
+  viralFormats      Json
+  growingNiches     String[]
+  source            TrendSource    @default(MOCK)
+  createdAt         DateTime       @default(now())
+
+  contentIdeas ContentIdea[]
+
+  @@unique([date, platform])
+}
+
+model ContentIdea {
+  id              String         @id @default(cuid())
+  trendSnapshotId String
+  trendSnapshot   TrendSnapshot  @relation(fields: [trendSnapshotId], references: [id])
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id])
+  title           String
+  description     String
+  createdAt       DateTime       @default(now())
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Job (storico persistente, oltre allo stato in Redis/BullMQ)
+// ──────────────────────────────────────────────────────────────────────────
+
+model Job {
+  id         String    @id @default(cuid())
+  type       JobType
+  videoId    String?
+  video      Video?    @relation(fields: [videoId], references: [id])
+  refId      String?   // id generico (es. clipId per CLIP_EXPORT)
+  status     JobStatus @default(PENDING)
+  attempts   Int       @default(0)
+  lastError  String?
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([status])
+}

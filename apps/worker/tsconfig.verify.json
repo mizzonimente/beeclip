@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@clipmanager/shared": ["../../packages/shared/src/index.ts"],
+      "@clipmanager/db": ["../../packages/db/src/index.ts"],
+      "@clipmanager/storage": ["../../packages/storage/src/index.ts"],
+      "@clipmanager/ai-core": ["../../packages/ai-core/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}
