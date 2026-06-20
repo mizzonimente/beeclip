@@ -67,11 +67,23 @@ export function buildClipRenderArgs(spec: ClipRenderSpec): string[] {
 
   return [
     "-y",
+    // Stesso motivo del "-threads 2" sull'encoder più sotto: anche il
+    // filter_complex (trim/crop/scale/subtitles) auto-rileva i core fisici
+    // e va limitato esplicitamente, altrimenti contribuisce allo stesso OOM.
+    "-filter_threads", "2",
+    "-filter_complex_threads", "2",
     "-i", spec.sourcePath,
     "-filter_complex", filters.join(";"),
     "-map", `[${lastV}]`,
     "-map", `[${lastA}]`,
     "-c:v", "libx264",
+    // Senza questo limite, libx264 auto-rileva i core della macchina FISICA
+    // (non quelli allocati al container) e su Railway arriva a spawnare
+    // ~60 thread di encoding: il sovraccarico di memoria dei buffer di
+    // lookahead per-thread fa scattare l'OOM killer del container (2 vCPU /
+    // 1GB qui), che termina ffmpeg con un segnale -> "exited with code null"
+    // e il rendering della clip fallisce sempre, anche su video corti.
+    "-threads", "2",
     "-preset", "veryfast",
     "-crf", "21",
     "-c:a", "aac",
