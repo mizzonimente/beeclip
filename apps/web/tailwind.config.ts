@@ -11,8 +11,8 @@ import type { Config } from "tailwindcss";
  * per CTA, accenti e stato attivo; "surface" resta un nero quasi puro (con
  * una punta di calore per accompagnare l'oro) invece del nero-blu di prima.
  * Essendo l'unico punto di definizione, il cambio di palette si propaga da
- * solo a tutti i componenti che già usano i token bg-brand-*/text-brand-*/
- * bg-surface-* senza dover toccare ogni file.
+ * solo a tutti i componenti che già usano i token bg-brand, text-brand
+ * e bg-surface senza dover toccare ogni file.
  */
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
