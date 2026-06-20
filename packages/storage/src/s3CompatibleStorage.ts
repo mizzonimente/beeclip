@@ -10,6 +10,7 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "node:stream";
 import type { StorageAdapter } from "./types.js";
@@ -54,9 +55,19 @@ export class S3CompatibleStorage implements StorageAdapter {
   }
 
   async putObjectFromStream(key: string, stream: NodeJS.ReadableStream, contentType?: string): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: stream as Readable, ContentType: contentType })
-    );
+    // Niente PutObjectCommand qui: con un Body in streaming la lunghezza non
+    // è nota in anticipo, e l'SDK v3 (checksum "flexible" attivati di
+    // default su alcune versioni) finisce per calcolare l'header
+    // "x-amz-decoded-content-length" come undefined, causando un 500
+    // (ERR_HTTP_INVALID_HEADER_VALUE) ad ogni upload. `Upload` di
+    // @aws-sdk/lib-storage è il pattern raccomandato da AWS per stream di
+    // lunghezza ignota: gestisce internamente un multipart upload e non ha
+    // bisogno di ContentLength.
+    const upload = new Upload({
+      client: this.client,
+      params: { Bucket: this.bucket, Key: key, Body: stream as Readable, ContentType: contentType },
+    });
+    await upload.done();
   }
 
   async downloadToTempFile(key: string): Promise<string> {
