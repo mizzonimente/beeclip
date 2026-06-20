@@ -135,6 +135,26 @@ function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+/**
+ * Bonus (0-25) per quanto la durata di una finestra candidata è vicina alla
+ * durata media desiderata dall'utente (`avgClipDurationSeconds`, impostabile
+ * in upload). Falloff lineare: bonus massimo quando duration === target,
+ * zero quando la distanza è pari (o superiore) all'intero range min-max
+ * disponibile. Senza un target impostato non c'è bonus (né penalità): le
+ * finestre vengono valutate solo sugli altri criteri, come prima.
+ */
+export function durationFitBonus(
+  duration: number,
+  target: number | undefined,
+  minDuration: number,
+  maxDuration: number
+): number {
+  if (!target) return 0;
+  const span = Math.max(1, maxDuration - minDuration);
+  const distance = Math.abs(duration - target);
+  return Math.max(0, 25 * (1 - distance / span));
+}
+
 interface Window {
   startSeconds: number;
   endSeconds: number;
@@ -201,13 +221,21 @@ export class HeuristicAnalysisProvider implements LanguageModelProvider {
       const clarityScore = scoreClarity(w.text);
       const standaloneScore = scoreStandalone(w.text);
 
+      const fitBonus = durationFitBonus(
+        duration,
+        config.avgClipDurationSeconds,
+        config.minClipDurationSeconds,
+        config.maxClipDurationSeconds
+      );
+
       const aggregateScore = clamp(
         hookScore * weights.hook +
           emotionScore * weights.emotion +
           retentionScore * weights.retention +
           pacingScore * weights.pacing +
           clarityScore * weights.clarity +
-          standaloneScore * weights.standalone
+          standaloneScore * weights.standalone +
+          fitBonus
       );
 
       const emotionTags = EMOTION_KEYWORDS.filter((k) => w.text.toLowerCase().includes(k));
@@ -217,6 +245,9 @@ export class HeuristicAnalysisProvider implements LanguageModelProvider {
           : densityBonus > 0
             ? ", montaggio dinamico rilevato"
             : "";
+      const durationNote = config.avgClipDurationSeconds
+        ? `, durata ${Math.round(duration)}s vs target ${config.avgClipDurationSeconds}s`
+        : "";
 
       return {
         startSeconds: w.startSeconds,
@@ -229,7 +260,7 @@ export class HeuristicAnalysisProvider implements LanguageModelProvider {
         standaloneScore,
         aggregateScore,
         emotionTags,
-        rationale: `Hook ${hookScore}/100, emozione ${emotionScore}/100, ritmo ${pacingScore}/100, chiarezza ${clarityScore}/100, autonomia ${standaloneScore}/100 (pesi per tipo ${contentType}${visualNote}).`,
+        rationale: `Hook ${hookScore}/100, emozione ${emotionScore}/100, ritmo ${pacingScore}/100, chiarezza ${clarityScore}/100, autonomia ${standaloneScore}/100 (pesi per tipo ${contentType}${visualNote}${durationNote}).`,
         provider: "heuristic-mock" as const,
       };
     });

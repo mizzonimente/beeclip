@@ -10,3 +10,4 @@ export * from "./crop/ffmpegFilters.js";
 export * from "./social/index.js";
 export * from "./trends/index.js";
 export * from "./ffmpeg/index.js";
+export * from "./facetrack/index.js";

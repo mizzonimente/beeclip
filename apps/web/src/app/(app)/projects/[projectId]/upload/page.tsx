@@ -74,6 +74,13 @@ export default function UploadVideoPage() {
       setError("La durata minima della clip non può superare quella massima.");
       return;
     }
+    if (avgClipDurationSeconds) {
+      const avg = Number(avgClipDurationSeconds);
+      if (avg < min || avg > max) {
+        setError("La durata media deve essere compresa tra la durata minima e massima della clip.");
+        return;
+      }
+    }
 
     const generationConfig = {
       mode,
@@ -81,9 +88,7 @@ export default function UploadVideoPage() {
       maxClipDurationSeconds: max,
       formats,
       ...(mode === "MANUAL" && desiredClipCount ? { desiredClipCount: Number(desiredClipCount) } : {}),
-      ...(mode === "MANUAL" && avgClipDurationSeconds
-        ? { avgClipDurationSeconds: Number(avgClipDurationSeconds) }
-        : {}),
+      ...(avgClipDurationSeconds ? { avgClipDurationSeconds: Number(avgClipDurationSeconds) } : {}),
     };
 
     if (sourceTab === "FILE") {
@@ -253,20 +258,21 @@ export default function UploadVideoPage() {
                           disabled={isUploading}
                           placeholder="Lascia vuoto per lasciare decidere l'AI"
                         />
-                        <Input
-                          label="Durata media clip (secondi)"
-                          type="number"
-                          min={5}
-                          max={600}
-                          value={avgClipDurationSeconds}
-                          onChange={(e) => setAvgClipDurationSeconds(e.target.value)}
-                          disabled={isUploading}
-                          placeholder="Lascia vuoto per lasciare decidere l'AI"
-                        />
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <Input
+                        label="Durata media clip (secondi)"
+                        type="number"
+                        min={5}
+                        max={600}
+                        value={avgClipDurationSeconds}
+                        onChange={(e) => setAvgClipDurationSeconds(e.target.value)}
+                        disabled={isUploading}
+                        placeholder="Lascia vuoto per lasciare decidere l'AI"
+                        helperText="Le clip generate punteranno a questa durata, quando il contenuto lo permette."
+                      />
                       <Input
                         label="Durata minima clip (secondi)"
                         type="number"

@@ -1,7 +1,7 @@
 import type { CropRegion } from "@clipmanager/shared";
 import { CLIP_FORMATS, type ClipFormatKey } from "@clipmanager/shared";
 
-export type CropModeKey = "CENTER" | "SMART" | "MANUAL";
+export type CropModeKey = "CENTER" | "SMART" | "MANUAL" | "LETTERBOX";
 
 export interface SourceDimensions {
   width: number;
@@ -11,8 +11,9 @@ export interface SourceDimensions {
 /**
  * Calcola la regione di crop per un formato target.
  *
- * - CENTER: crop centrato classico.
- * - SMART (v1): crop centrato ma pesato verso il terzo superiore
+ * - CENTER: crop "a copertura" (riempie tutto il frame target, senza bande)
+ *   centrato classico.
+ * - SMART (v1): crop "a copertura" ma pesato verso il terzo superiore
  *   dell'inquadratura (regola dei terzi) — euristica ragionevole per
  *   contenuti "talking head" dove il volto tende a stare nella metà alta.
  *   È un punto di estensione esplicito: in v2 questo modulo può ricevere
@@ -21,6 +22,12 @@ export interface SourceDimensions {
  *   regola fissa — l'interfaccia di `computeCrop` non cambierebbe.
  * - MANUAL: usa la regione fornita dall'utente, validata contro i bounds
  *   dell'immagine sorgente.
+ * - LETTERBOX: nessun crop, si mantiene l'intero frame sorgente. La
+ *   differenza di aspect ratio viene gestita a valle da
+ *   `buildCropScaleFilter` con scale+pad, producendo le classiche bande
+ *   nere "a contenitore" — qui è una scelta intenzionale dell'utente
+ *   (formato originale sempre visibile, niente tagliato), non il bug per
+ *   cui CENTER/SMART finivano per produrla sempre (vedi fix sotto).
  */
 export function computeCrop(
   source: SourceDimensions,
@@ -33,6 +40,10 @@ export function computeCrop(
     return clampToSource(manualCrop, source);
   }
 
+  if (mode === "LETTERBOX") {
+    return { x: 0, y: 0, width: source.width, height: source.height };
+  }
+
   const targetSpec = CLIP_FORMATS[format];
   const targetRatio = targetSpec.width && targetSpec.height ? targetSpec.width / targetSpec.height : source.width / source.height;
   const sourceRatio = source.width / source.height;
@@ -40,8 +51,12 @@ export function computeCrop(
   let cropWidth: number;
   let cropHeight: number;
 
-  if (targetRatio > sourceRatio) {
-    // Il target è più "largo" del sorgente: limitiamo per altezza.
+  // Crop "a copertura" (cover, niente bande): se il sorgente è più "largo"
+  // del target limitiamo per altezza (manteniamo tutta l'altezza, tagliamo
+  // ai lati); se è più "alto"/strict del target limitiamo per larghezza.
+  // NB: questa condizione era invertita (bug) — produceva sempre il frame
+  // sorgente intero, che finiva poi letterboxato da buildCropScaleFilter.
+  if (sourceRatio > targetRatio) {
     cropHeight = source.height;
     cropWidth = Math.round(cropHeight * targetRatio);
   } else {

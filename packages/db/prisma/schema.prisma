@@ -58,6 +58,7 @@ enum CropMode {
   CENTER
   SMART
   MANUAL
+  LETTERBOX
 }
 
 enum ClipStatus {

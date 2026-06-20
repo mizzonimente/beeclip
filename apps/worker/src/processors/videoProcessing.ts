@@ -21,10 +21,13 @@ import {
   createTranscriptionProvider,
   createAnalysisProvider,
   createMetadataProvider,
+  computeFaceTrackingTrajectory,
+  toPixelKeyframes,
   type ClipRenderSpec,
   type KeepRange,
   type AnalysisContext,
   type BrandContext,
+  type DynamicCrop,
 } from "@clipmanager/ai-core";
 import { buildObjectKey, type StorageAdapter } from "@clipmanager/storage";
 import { withTempDir, tempPath } from "../lib/tempDir.js";
@@ -310,6 +313,7 @@ async function runPipeline(
             transcript,
             workDir,
             storage,
+            env,
           });
         }
       }
@@ -343,6 +347,7 @@ interface RenderOneClipArgs {
   transcript: { provider: string; segments: TranscriptSegment[] };
   workDir: string;
   storage: StorageAdapter;
+  env: Env;
 }
 
 /**
@@ -353,7 +358,7 @@ interface RenderOneClipArgs {
  * Ritorna 1 se il rendering è andato a buon fine, 0 altrimenti.
  */
 async function renderOneClip(args: RenderOneClipArgs): Promise<0 | 1> {
-  const { candidateId, draft, format, video, sourcePath, sourceDims, silences, transcript, workDir, storage } = args;
+  const { candidateId, draft, format, video, sourcePath, sourceDims, silences, transcript, workDir, storage, env } = args;
 
   const clip = await prisma.clip.create({
     data: { clipCandidateId: candidateId, projectId: video.projectId, format, cropMode: "SMART", status: "RENDERING" },
@@ -362,6 +367,31 @@ async function renderOneClip(args: RenderOneClipArgs): Promise<0 | 1> {
   try {
     const crop = computeCrop(sourceDims, format, "SMART");
     const keepRanges: KeepRange[] = computeKeepRangesForClip(silences, draft.startSeconds, draft.endSeconds);
+
+    // Face-tracking è un arricchimento del crop SMART, non un requisito: se
+    // fallisce (modello/ffmpeg in errore su questo segmento) o non rileva
+    // mai un volto, si ricade silenziosamente sul crop statico già calcolato
+    // sopra — stessa filosofia già usata per `sceneChanges` più sopra in
+    // questo file. `clipStartSeconds`/`clipEndSeconds` qui sono gli stessi
+    // secondi ASSOLUTI nel video sorgente passati a `renderClip` sotto (vedi
+    // commento su `FaceTrackingInput` in facetrack/computeFaceTrackingTrajectory.ts).
+    let dynamicCrop: DynamicCrop | undefined;
+    if (env.FACE_TRACKING_ENABLED) {
+      try {
+        const trajectory = await computeFaceTrackingTrajectory({
+          sourcePath,
+          clipStartSeconds: draft.startSeconds,
+          clipEndSeconds: draft.endSeconds,
+          workDir,
+        });
+        if (trajectory) {
+          const pixelKeyframes = toPixelKeyframes(trajectory, sourceDims.width, sourceDims.height, crop.width, crop.height);
+          dynamicCrop = { keyframes: pixelKeyframes, width: crop.width, height: crop.height };
+        }
+      } catch (err) {
+        console.warn(`[video-processing] face-tracking fallito per candidato ${candidateId}/${format}:`, err);
+      }
+    }
 
     // I sottotitoli bruciati nel video hanno senso solo con una trascrizione
     // reale: il provider euristico (senza chiavi API) produce solo
@@ -384,6 +414,7 @@ async function renderOneClip(args: RenderOneClipArgs): Promise<0 | 1> {
       clipStartSeconds: draft.startSeconds,
       clipEndSeconds: draft.endSeconds,
       crop,
+      dynamicCrop,
       format,
       srtPath,
       keepRanges,

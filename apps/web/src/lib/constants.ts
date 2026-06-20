@@ -49,9 +49,10 @@ export const TREND_PLATFORM_OPTIONS: { value: TrendPlatformKey; label: string }[
 }));
 
 export const CROP_MODE_LABELS: Record<CropModeKey, string> = {
-  CENTER: "Centrato",
-  SMART: "Intelligente (segue il soggetto)",
+  CENTER: "Tutto schermo (centrato)",
+  SMART: "Tutto schermo (segue il soggetto)",
   MANUAL: "Manuale",
+  LETTERBOX: "Orizzontale con bande nere",
 };
 
 export const CROP_MODE_OPTIONS = (Object.keys(CROP_MODE_LABELS) as CropModeKey[]).map((value) => ({

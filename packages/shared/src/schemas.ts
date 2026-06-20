@@ -81,7 +81,7 @@ export type CreateSocialProfileInput = z.infer<typeof createSocialProfileSchema>
 
 export const exportClipSchema = z.object({
   format: z.enum(["VERTICAL_9_16", "SQUARE_1_1", "HORIZONTAL_16_9", "VERTICAL_4_5", "CUSTOM"]),
-  cropMode: z.enum(["CENTER", "SMART", "MANUAL"]).default("SMART"),
+  cropMode: z.enum(["CENTER", "SMART", "MANUAL", "LETTERBOX"]).default("SMART"),
   customCrop: z
     .object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() })
     .optional(),

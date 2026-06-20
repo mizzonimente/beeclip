@@ -10,8 +10,11 @@ import {
   buildSrt,
   renderClip,
   extractThumbnail,
+  computeFaceTrackingTrajectory,
+  toPixelKeyframes,
   type ClipRenderSpec,
   type KeepRange,
+  type DynamicCrop,
 } from "@clipmanager/ai-core";
 import { buildObjectKey } from "@clipmanager/storage";
 import { withTempDir, tempPath } from "../lib/tempDir.js";
@@ -137,6 +140,31 @@ async function renderAndPersist(clip: ClipWithRelations, env: Env): Promise<void
       const manualCrop = clip.customCrop as unknown as CropRegion | null;
       const crop = computeCrop(sourceDims, clip.format, clip.cropMode, manualCrop ?? undefined);
 
+      // Face-tracking solo per il crop SMART: questa funzione gestisce
+      // anche le ri-esportazioni in MANUAL/CENTER/LETTERBOX (scelta esplicita
+      // dell'utente in fase di export), dove sovrascrivere il crop con una
+      // traiettoria inseguita sarebbe un comportamento a sorpresa rispetto
+      // a quanto richiesto. È comunque un arricchimento, non un requisito:
+      // se fallisce o non trova un volto si ricade sul crop statico già
+      // calcolato sopra (stessa filosofia di videoProcessing.ts).
+      let dynamicCrop: DynamicCrop | undefined;
+      if (env.FACE_TRACKING_ENABLED && clip.cropMode === "SMART") {
+        try {
+          const trajectory = await computeFaceTrackingTrajectory({
+            sourcePath,
+            clipStartSeconds: clipCandidate.startSeconds,
+            clipEndSeconds: clipCandidate.endSeconds,
+            workDir,
+          });
+          if (trajectory) {
+            const pixelKeyframes = toPixelKeyframes(trajectory, sourceDims.width, sourceDims.height, crop.width, crop.height);
+            dynamicCrop = { keyframes: pixelKeyframes, width: crop.width, height: crop.height };
+          }
+        } catch (err) {
+          console.warn(`[clip-export] face-tracking fallito per clip ${clip.id}:`, err);
+        }
+      }
+
       const transcript = await prisma.transcript.findUnique({ where: { videoId: video.id } });
       let srtPath: string | undefined;
       if (transcript && transcript.provider !== "heuristic-mock") {
@@ -162,6 +190,7 @@ async function renderAndPersist(clip: ClipWithRelations, env: Env): Promise<void
         clipStartSeconds: clipCandidate.startSeconds,
         clipEndSeconds: clipCandidate.endSeconds,
         crop,
+        dynamicCrop,
         format: clip.format,
         srtPath,
         keepRanges,

@@ -1,6 +1,7 @@
 import type { CropRegion } from "@clipmanager/shared";
 import type { ClipFormatKey } from "@clipmanager/shared";
 import { buildCropScaleFilter } from "../crop/ffmpegFilters.js";
+import { buildDynamicCropScaleFilter, type DynamicCrop } from "../facetrack/dynamicCropFilter.js";
 import { runCommand } from "./runFfmpeg.js";
 
 export interface KeepRange {
@@ -14,6 +15,15 @@ export interface ClipRenderSpec {
   clipStartSeconds: number;
   clipEndSeconds: number;
   crop: CropRegion;
+  /** Se presente, il rettangolo di crop segue il volto rilevato nel tempo
+   *  invece di restare fisso a `crop` (vedi `facetrack/computeFaceTrackingTrajectory.ts`
+   *  + `facetrack/dynamicCropFilter.ts`): il chiamante calcola la traiettoria
+   *  PRIMA di invocare `renderClip` e la passa già pronta qui. Quando
+   *  presente ha la precedenza su `crop` nella costruzione del filtro
+   *  ffmpeg — `crop` resta comunque obbligatorio perché è il fallback
+   *  scelto dal chiamante quando il rilevamento volto non trova nulla
+   *  (vedi i processor in apps/worker che decidono se passare questo campo). */
+  dynamicCrop?: DynamicCrop;
   format: ClipFormatKey;
   /** Path di un file .srt con timestamp già relativi all'inizio della clip. */
   srtPath?: string;
@@ -45,7 +55,9 @@ export function buildClipRenderArgs(spec: ClipRenderSpec): string[] {
   let lastV = "v0";
   let lastA = "a0";
 
-  const cropScale = buildCropScaleFilter(spec.crop, spec.format);
+  const cropScale = spec.dynamicCrop
+    ? buildDynamicCropScaleFilter(spec.dynamicCrop, spec.format)
+    : buildCropScaleFilter(spec.crop, spec.format);
   filters.push(`[${lastV}]${cropScale}[v1]`);
   lastV = "v1";
 

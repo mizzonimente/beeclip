@@ -13,7 +13,9 @@ FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
 # openssl: richiesto da Prisma. ffmpeg: richiesto dai processori video.
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg \
+# libgomp1: richiesto dal binario nativo di @tensorflow/tfjs-node (il
+# binding C++ usa OpenMP per il rilevamento volto del face-tracking).
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates ffmpeg libgomp1 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./

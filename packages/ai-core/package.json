@@ -10,7 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@clipmanager/shared": "*"
+    "@clipmanager/shared": "*",
+    "@vladmandic/face-api": "^1.7.15",
+    "@tensorflow/tfjs-node": "^4.22.0"
   },
   "devDependencies": {
     "typescript": "^5.5.4",

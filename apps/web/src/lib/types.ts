@@ -117,7 +117,7 @@ export interface AnalysisResult {
 }
 
 export type ClipStatusKey = "QUEUED" | "RENDERING" | "READY" | "FAILED";
-export type CropModeKey = "CENTER" | "SMART" | "MANUAL";
+export type CropModeKey = "CENTER" | "SMART" | "MANUAL" | "LETTERBOX";
 
 export interface Clip {
   id: string;

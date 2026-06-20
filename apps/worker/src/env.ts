@@ -30,6 +30,14 @@ const envSchema = z.object({
   TREND_CURATED_FEED_PATH: z.string().optional(),
   TREND_CURATED_MAX_AGE_DAYS: z.string().optional(),
 
+  // Face-tracking reale (rilevamento volto per-fotogramma) per il crop
+  // SMART: di default disattivato perché aumenta sensibilmente il tempo di
+  // elaborazione di ogni clip (decodifica fotogrammi campione + inferenza
+  // del modello, per ogni candidato). Quando disattivato o in caso di
+  // errore/nessun volto rilevato, il crop SMART ricade sul comportamento
+  // statico esistente (vedi apps/worker/src/processors/videoProcessing.ts).
+  FACE_TRACKING_ENABLED: z.coerce.boolean().default(false),
+
   // Concorrenza dei processor BullMQ: il video-processing è il più pesante
   // (ffmpeg + AI), tenuto basso di default per non saturare la CPU di una
   // singola istanza worker in sviluppo.
